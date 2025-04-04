@@ -1,0 +1,30 @@
+<%- | String                                           $prosa_name,
+      ProSA::TelemetryLevel                            $telemetry_level = 'warn',
+      Hash[String, Hash[String, Hash[String, String]]] $observability
+| -%>
+# Main configuration file for ProSA: Managed by Puppet.
+# It contain the configuration that every ProSA instance must have
+name: <%= $prosa_name %>
+observability:
+  level: <%= $telemetry_level %>
+<%- if $observability { -%>
+<%- $observability.keys.each |$telemetry_type| { -%>
+  <%= $telemetry_type %>:
+<%- $observability[$telemetry_type].keys.each |$param| { -%>
+  <%- if $param == 'otlp' or $param == 'prometheus' { -%>
+    otlp:
+    <%- $observability[$telemetry_type][$param].keys.each |$val| { -%>
+      <%= $val %>: <%= $observability[$telemetry_type][$param][$val] %>
+    <%- } -%>
+  <%- } -%>
+  <%- if $param == 'stdout' { -%>
+    stdout:
+    <%- if $observability[$telemetry_type][$param]['level'] { -%>
+      level: <%= $observability[$telemetry_type][$param]['level'] %>
+    <%- } else { -%>
+      level: <%= $telemetry_level %>
+    <%- } -%>
+  <%- } -%>
+<%- } -%>
+<%- } -%>
+<%- } -%>
