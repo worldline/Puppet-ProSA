@@ -27,8 +27,8 @@ class prosa::service (
   }
 
   # If the service provider is systemd
-  if find_file('/usr/lib/systemd/system') {
-    file { "/usr/lib/systemd/system/${service_name}.service":
+  if find_file('/etc/systemd/system') {
+    file { "/etc/systemd/system/${service_name}.service":
       ensure  => file,
       owner   => 'root',
       group   => $prosa::params::root_group,
@@ -47,8 +47,10 @@ class prosa::service (
       service { $service_name:
         ensure  => $_service_ensure,
         enable  => $service_enable,
-        require => File["/usr/lib/systemd/system/${service_name}.service"],
+        require => File["/etc/systemd/system/${service_name}.service"],
       }
     }
+  } elsif $service_manage { # The service provider need to be handle if the service is managed
+    fail('Your system service provider is not handle by this module')
   }
 }

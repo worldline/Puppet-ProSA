@@ -70,8 +70,8 @@
 class prosa (
   String $prosa_name                                              = $prosa::params::prosa_name,
   String $service_name                                            = $prosa::params::service_name,
-  Optional[String] $bin_repo                                      = $prosa::params::bin_repo,
-  Stdlib::Absolutepath $bin_path                                  = '/usr/local/bin/prosa',
+  Optional[String] $bin_repo                                      = undef,
+  Stdlib::Absolutepath $bin_path                                  = $prosa::params::bin_path,
   Stdlib::Absolutepath $log_dir                                   = '/var/log',
   Stdlib::Absolutepath $conf_dir                                  = $prosa::params::conf_dir,
   Boolean $service_enable                                         = true,
