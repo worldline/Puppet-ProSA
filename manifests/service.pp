@@ -26,31 +26,32 @@ class prosa::service (
     }
   }
 
-  # If the service provider is systemd
-  if find_file('/etc/systemd/system') {
-    file { "/etc/systemd/system/${service_name}.service":
-      ensure  => file,
-      owner   => 'root',
-      group   => $prosa::params::root_group,
-      mode    => '0644',
-      content => epp('prosa/service.epp', {
-          'prosa_name' => $prosa_name,
-          'user'       => $user,
-          'group'      => $group,
-          'bin_path'   => $service_binary,
-          'conf_path'  => $app_conf,
-      }),
-      replace => true,
+  # Only create file and service if it need to be managed
+  if $service_manage {
+    # If the service provider is systemd
+    if find_file('/etc/systemd/system') {
+      file { "/etc/systemd/system/${service_name}.service":
+        ensure  => file,
+        owner   => 'root',
+        group   => $prosa::params::root_group,
+        mode    => '0644',
+        content => epp('prosa/service.epp', {
+            'prosa_name' => $prosa_name,
+            'user'       => $user,
+            'group'      => $group,
+            'bin_path'   => $service_binary,
+            'conf_path'  => $app_conf,
+        }),
+        replace => true,
+      }
+    } else { # The service provider need to be handle if the service is managed
+      fail('Your system service provider is not handle by this module')
     }
 
-    if $service_manage {
-      service { $service_name:
-        ensure  => $_service_ensure,
-        enable  => $service_enable,
-        require => File["/etc/systemd/system/${service_name}.service"],
-      }
+    service { $service_name:
+      ensure  => $_service_ensure,
+      enable  => $service_enable,
+      require => File["/etc/systemd/system/${service_name}.service"],
     }
-  } elsif $service_manage { # The service provider need to be handle if the service is managed
-    fail('Your system service provider is not handle by this module')
   }
 }
