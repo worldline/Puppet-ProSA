@@ -1,8 +1,9 @@
 {
   "name": "worldline-prosa",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "author": "Worldline",
   "summary": "Installs, configures, and manages ProSA.",
+  "tags": ["worldline", "prosa", "transactional", "payments"],
   "license": "LGPL-3.0",
   "source": "https://github.com/worldline/puppet-prosa",
   "project_page": "https://github.com/worldline/puppet-prosa",
