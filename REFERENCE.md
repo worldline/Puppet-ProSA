@@ -82,7 +82,7 @@ Data type: `Optional[String]`
 Link to the binary repository where the ProSA binary can be find.
 See [Puppet File source attribute](https://www.puppet.com/docs/puppet/8/types/file.html#file-attribute-source) to set this parameter
 
-Default value: `$prosa::params::bin_repo`
+Default value: `undef`
 
 ##### <a name="-prosa--bin_path"></a>`bin_path`
 
@@ -90,7 +90,7 @@ Data type: `Stdlib::Absolutepath`
 
 Sets the path where the ProSA binary will be located.
 
-Default value: `'/usr/local/bin/prosa'`
+Default value: `$prosa::params::bin_path`
 
 ##### <a name="-prosa--log_dir"></a>`log_dir`
 

@@ -52,6 +52,7 @@ To set up ProSA, you need to use the [`prosa`][https://forge.puppet.com/modules/
 
 From this class, you should specify the binary repository to retrieve the ProSA binary.
 Additionally, observability is configured by default, but you may need to specify parameters based on your particular stack.
+For more details on configuration, please refer to the [ProSA configuration guide](https://worldline.github.io/ProSA/ch01-02-config.html).
 
 ```puppet
 class { 'prosa':
