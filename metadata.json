@@ -1,6 +1,6 @@
 {
   "name": "worldline-prosa",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "author": "Worldline",
   "summary": "Installs, configures, and manages ProSA.",
   "tags": ["worldline", "prosa", "transactional", "payments"],

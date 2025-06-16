@@ -16,8 +16,26 @@ describe 'prosa::processors class' do
 
     pp = <<-MANIFEST
         class { 'prosa':
-          prosa_name => #{prosa_hash['prosa_name']},
-          service_manage => false,
+          prosa_name      => #{prosa_hash['prosa_name']},
+          service_manage  => false,
+          telemetry_level => 'warn',
+          observability   => {
+            'metrics' => {
+              'prometheus' => {
+                'endpoint' => '0.0.0.0:9090',
+              },
+            },
+            'traces'  => {
+              'stdout' => {
+                'level' => 'info',
+              },
+            },
+            'logs'    => {
+              'stdout' => {
+                'level' => 'info',
+              },
+            },
+          },
         }
         class { 'prosa::processors':
           processors => {
@@ -48,6 +66,11 @@ describe 'prosa::processors class' do
     MANIFEST
     it 'creates custom processor config files' do
       apply_manifest(pp, catch_failures: true)
+    end
+
+    describe file("#{prosa_hash['conf_dir']}/prosa.yml") do
+      it { is_expected.to contain 'name: prosa-acceptance' }
+      it { is_expected.to contain '    prometheus:' }
     end
 
     describe file("#{prosa_hash['conf_dir']}/stub-1.yml") do

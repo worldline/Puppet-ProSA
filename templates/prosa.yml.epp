@@ -12,7 +12,7 @@ observability:
   <%= $telemetry_type %>:
 <%- $observability[$telemetry_type].keys.each |$param| { -%>
   <%- if $param == 'otlp' or $param == 'prometheus' { -%>
-    otlp:
+    <%= $param %>:
     <%- $observability[$telemetry_type][$param].keys.each |$val| { -%>
       <%= $val %>: <%= $observability[$telemetry_type][$param][$val] %>
     <%- } -%>
