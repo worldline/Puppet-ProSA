@@ -129,7 +129,7 @@ class prosa (
       group  => $prosa::params::root_group,
       mode   => '0755',
       source => $bin_repo,
-      before => Class['prosa::service'],
+      notify => Class['prosa::service'],
     }
   }
 

@@ -61,14 +61,12 @@ class { 'prosa':
   observability   => {
     'metrics' => {
       'otlp' => {
-        'endpoint' => 'http://opentelemetry-collector:4317',
-        'protocol' => 'Grpc'
+        'endpoint' => 'grpc://opentelemetry-collector:4317',
       },
     },
     'traces' => {
       'otlp' => {
-        'endpoint' => 'http://opentelemetry-collector:4317',
-        'protocol' => 'Grpc'
+        'endpoint' => 'grpc://opentelemetry-collector:4317',
       },
       'stdout' => {
         'level' => 'info',
@@ -76,8 +74,7 @@ class { 'prosa':
     },
     'logs' => {
       'otlp' => {
-        'endpoint' => 'http://opentelemetry-collector:4317',
-        'protocol' => 'Grpc'
+        'endpoint' => 'grpc://opentelemetry-collector:4317',
       },
       'stdout' => {
         'level' => 'info',
