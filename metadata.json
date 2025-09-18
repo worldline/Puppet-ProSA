@@ -1,6 +1,6 @@
 {
   "name": "worldline-prosa",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "author": "Worldline",
   "summary": "Installs, configures, and manages ProSA.",
   "license": "LGPL-3.0",
@@ -25,7 +25,8 @@
       "operatingsystem": "Debian",
       "operatingsystemrelease": [
         "11",
-        "12"
+        "12",
+        "13"
       ]
     },
     {
