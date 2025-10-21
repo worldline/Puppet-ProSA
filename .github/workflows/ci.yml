@@ -41,7 +41,7 @@ jobs:
       - name: Setup Test Matrix
         id: get-matrix
         run: |
-          bundle exec matrix_from_metadata_v3 --puppet-exclude 7
+          bundle exec matrix_from_metadata_v3
 
   acceptance:
     name: "Acceptance tests (${{matrix.platforms.label}}, ${{matrix.collection}})"
@@ -97,12 +97,7 @@ jobs:
 
       - name: "Install Puppet agent"
         run: |
-          if [[ "${{ matrix.collection.version }}" ]] ; then
-            export PUPPET_VERSION=${{ matrix.collection.version }}
-            bundle exec rake 'litmus:install_agent[${{ matrix.collection.collection }}]'
-          else
-            bundle exec rake 'litmus:install_agent[${{ matrix.collection }}]'
-          fi
+          bundle exec rake 'litmus:install_agent'
 
       - name: "Install module"
         run: |
