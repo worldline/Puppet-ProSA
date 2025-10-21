@@ -22,7 +22,6 @@ jobs:
       BUNDLE_WITHOUT: release_prep
 
     steps:
-
       - name: "Checkout"
         uses: "actions/checkout@v4"
 
@@ -41,7 +40,7 @@ jobs:
       - name: Setup Test Matrix
         id: get-matrix
         run: |
-          bundle exec matrix_from_metadata_v3
+          bundle exec matrix_from_metadata_v3 --puppet-exclude 7
 
   acceptance:
     name: "Acceptance tests (${{matrix.platforms.label}}, ${{matrix.collection}})"
@@ -61,16 +60,6 @@ jobs:
       - name: "Checkout"
         uses: "actions/checkout@v4"
 
-#      - name: "Disable Apparmor"
-#        if: ${{ inputs.disable_apparmor }}
-#        run: |
-#          if command -v apparmor_parser >/dev/null ; then
-#            sudo find /etc/apparmor.d/ -maxdepth 1 -type f -exec ln -sf {} /etc/apparmor.d/disable/ \;
-#            sudo apparmor_parser -R /etc/apparmor.d/disable/* || true
-#            sudo systemctl disable apparmor
-#            sudo systemctl stop apparmor
-#          fi
-
       - name: "Setup ruby"
         uses: "ruby/setup-ruby@v1"
         with:
@@ -85,11 +74,7 @@ jobs:
 
       - name: "Provision environment"
         run: |
-          if [[ "${{ inputs.kernel_modules }}" == "true" ]] && [[ "${{matrix.platforms.provider}}" =~ docker* ]] ; then
-            DOCKER_RUN_OPTS="docker_run_opts: {'--volume': '/lib/modules/$(uname -r):/lib/modules/$(uname -r)'}"
-          else
-            DOCKER_RUN_OPTS=''
-          fi
+          DOCKER_RUN_OPTS=''
           bundle exec rake "litmus:provision[${{matrix.platforms.provider}},${{ matrix.platforms.image }},$DOCKER_RUN_OPTS]"
           # Redact password
           FILE='spec/fixtures/litmus_inventory.yaml'
