@@ -39,6 +39,11 @@
 #   to `false`, which is useful when you want to let the service be managed by another 
 #   application.<br />
 #
+# @param service_limit_nofile
+#   Sets the limit on the number of open file descriptors for the ProSA service.<br />
+#   This parameter corresponds to the `LimitNOFILE` directive in the systemd service unit file.<br />
+#   Apply the default system limit when set to `undef`.
+#
 # @param manage_user
 #   When `false`, stops Puppet from creating the user resource.<br />
 #   This is for instances when you have a user, created from another Puppet module, you want 
@@ -112,6 +117,7 @@ class prosa (
   Boolean $service_enable                                         = true,
   Boolean $service_manage                                         = true,
   Variant[Stdlib::Ensure::Service, Boolean] $service_ensure       = 'running',
+  Optional[Integer] $service_limit_nofile                         = undef,
   Boolean $manage_user                                            = true,
   Boolean $manage_group                                           = true,
   String $user                                                    = $prosa::params::user,

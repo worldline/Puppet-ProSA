@@ -24,6 +24,10 @@
 
 * [`ProSA::TelemetryLevel`](#ProSA--TelemetryLevel): A string that conforms to the ProSA `TelemetryLevel` syntax.
 
+### Tasks
+
+* [`version`](#version): Gets the ProSA components versions
+
 ## Classes
 
 ### <a name="prosa"></a>`prosa`
@@ -86,6 +90,7 @@ The following parameters are available in the `prosa` class:
 * [`service_enable`](#-prosa--service_enable)
 * [`service_manage`](#-prosa--service_manage)
 * [`service_ensure`](#-prosa--service_ensure)
+* [`service_limit_nofile`](#-prosa--service_limit_nofile)
 * [`manage_user`](#-prosa--manage_user)
 * [`manage_group`](#-prosa--manage_group)
 * [`user`](#-prosa--user)
@@ -171,6 +176,16 @@ to `false`, which is useful when you want to let the service be managed by anoth
 application.<br />
 
 Default value: `'running'`
+
+##### <a name="-prosa--service_limit_nofile"></a>`service_limit_nofile`
+
+Data type: `Optional[Integer]`
+
+Sets the limit on the number of open file descriptors for the ProSA service.<br />
+This parameter corresponds to the `LimitNOFILE` directive in the systemd service unit file.<br />
+Apply the default system limit when set to `undef`.
+
+Default value: `undef`
 
 ##### <a name="-prosa--manage_user"></a>`manage_user`
 
@@ -383,4 +398,20 @@ ProSA accept non case sensitive levels (like this type).
   * https://docs.rs/prosa-utils/latest/prosa_utils/config/tracing/enum.TelemetryLevel.html
 
 Alias of `Pattern[/\A(?i:error|warn|info|debug|trace|off)\Z/]`
+
+## Tasks
+
+### <a name="version"></a>`version`
+
+Gets the ProSA components versions
+
+**Supports noop?** false
+
+#### Parameters
+
+##### `node_role`
+
+Data type: `String[1]`
+
+The role of the node joining the swarm
 
