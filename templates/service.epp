@@ -3,6 +3,7 @@
       String               $group = 'prosa',
       Stdlib::Absolutepath $bin_path = '/usr/local/bin/prosa',
       Stdlib::Absolutepath $conf_path = '/etc/prosa',
+      Optional[Integer]    $limit_nofile = undef,
 | -%>
 [Unit]
 Description=ProSA service for <%= $prosa_name %>
@@ -14,6 +15,9 @@ Type=simple
 User=<%= $user %>
 Group=<%= $group %>
 ExecStart=<%= $bin_path %> -c <%= $conf_path %>
+<% if $limit_nofile { -%>
+LimitNOFILE=<%= $limit_nofile %>
+<% } -%>
 
 [Install]
 WantedBy=multi-user.target
