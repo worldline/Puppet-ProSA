@@ -1,5 +1,6 @@
 <%- | String                                           $prosa_name,
       ProSA::TelemetryLevel                            $telemetry_level = 'warn',
+      Optional[Hash[String, String]]                   $telemetry_attributes = undef,
       Hash[String, Hash[String, Hash[String, String]]] $observability
 | -%>
 # Main configuration file for ProSA: Managed by Puppet.
@@ -7,6 +8,12 @@
 name: <%= $prosa_name %>
 observability:
   level: <%= $telemetry_level %>
+<%- if $telemetry_attributes { -%>
+  attributes:
+  <%- $telemetry_attributes.each |$key, $value| { -%>
+    <%= $key %>: <%= $value %>
+  <%- } -%>
+<%- } -%>
 <%- if $observability { -%>
 <%- $observability.keys.each |$telemetry_type| { -%>
   <%= $telemetry_type %>:

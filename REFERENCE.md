@@ -38,6 +38,41 @@ A description of what this class does
 class { 'prosa': }
 ```
 
+##### Setting custom telemetry attributes
+
+```puppet
+class { 'prosa':
+  telemetry_attributes => {
+    'service.name' => 'prosa-service',
+    'host.id'      => 'fdbf79e8af94cb7f9e8df36789187052',
+  }
+}
+```
+
+##### Setting custom observability configuration
+
+```puppet
+class { 'prosa':
+  observability => {
+    'metrics' => {
+      'stdout' => {
+        'level' => 'info',
+      },
+    },
+    'traces'  => {
+      'stdout' => {
+        'level' => 'info',
+      },
+    },
+    'logs'    => {
+      'stdout' => {
+        'level' => 'info',
+      },
+    },
+  }
+}
+```
+
 #### Parameters
 
 The following parameters are available in the `prosa` class:
@@ -56,6 +91,7 @@ The following parameters are available in the `prosa` class:
 * [`user`](#-prosa--user)
 * [`group`](#-prosa--group)
 * [`telemetry_level`](#-prosa--telemetry_level)
+* [`telemetry_attributes`](#-prosa--telemetry_attributes)
 * [`observability`](#-prosa--observability)
 
 ##### <a name="-prosa--prosa_name"></a>`prosa_name`
@@ -185,12 +221,23 @@ which adjusts the verbosity of telemetry messages recorded.
 
 Default value: `$prosa::params::telemetry_level`
 
+##### <a name="-prosa--telemetry_attributes"></a>`telemetry_attributes`
+
+Data type: `Optional[Hash[String, String]]`
+
+Configures the ProSA [Telemetry Attributes](https://docs.rs/prosa-utils/latest/prosa_utils/config/observability/struct.Observability.html) directive
+which allows to add custom attributes to telemetry messages.
+Refer to the [ProSA book](https://worldline.github.io/ProSA/ch01-02-01-observability.html) for more details on how to configure this directive.
+
+Default value: `undef`
+
 ##### <a name="-prosa--observability"></a>`observability`
 
 Data type: `Hash[String, Hash[String, Hash[String, String]]]`
 
 Configures the ProSA [Observability](https://docs.rs/prosa-utils/latest/prosa_utils/config/observability/struct.Observability.html) directive
 which configure metrics, traces and logs export.
+Refer to the [ProSA book](https://worldline.github.io/ProSA/ch01-02-01-observability.html) for more details on how to configure this directive.
 
 Default value: `$prosa::params::observability`
 

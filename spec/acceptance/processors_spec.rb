@@ -19,6 +19,10 @@ describe 'prosa::processors class' do
           prosa_name      => #{prosa_hash['prosa_name']},
           service_manage  => false,
           telemetry_level => 'warn',
+          telemetry_attributes => {
+            'service.name' => 'prosa-service',
+            'host.id'      => 'fdbf79e8af94cb7f9e8df36789187052',
+          },
           observability   => {
             'metrics' => {
               'prometheus' => {
@@ -70,6 +74,8 @@ describe 'prosa::processors class' do
 
     describe file("#{prosa_hash['conf_dir']}/prosa.yml") do
       it { is_expected.to contain 'name: prosa-acceptance' }
+      it { is_expected.to contain '    service.name: prosa-service' }
+      it { is_expected.to contain '    host.id: fdbf79e8af94cb7f9e8df36789187052' }
       it { is_expected.to contain '    prometheus:' }
     end
 

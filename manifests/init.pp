@@ -63,9 +63,44 @@
 #   Configures the ProSA [TelemetryLevel](https://docs.rs/prosa-utils/latest/prosa_utils/config/tracing/enum.TelemetryLevel.html) directive
 #   which adjusts the verbosity of telemetry messages recorded.
 #
+# @param telemetry_attributes
+#   Configures the ProSA [Telemetry Attributes](https://docs.rs/prosa-utils/latest/prosa_utils/config/observability/struct.Observability.html) directive
+#   which allows to add custom attributes to telemetry messages.
+#   Refer to the [ProSA book](https://worldline.github.io/ProSA/ch01-02-01-observability.html) for more details on how to configure this directive.
+#
+# @example Setting custom telemetry attributes
+#   class { 'prosa':
+#     telemetry_attributes => {
+#       'service.name' => 'prosa-service',
+#       'host.id'      => 'fdbf79e8af94cb7f9e8df36789187052',
+#     }
+#   }
+#
 # @param observability
 #   Configures the ProSA [Observability](https://docs.rs/prosa-utils/latest/prosa_utils/config/observability/struct.Observability.html) directive
 #   which configure metrics, traces and logs export.
+#   Refer to the [ProSA book](https://worldline.github.io/ProSA/ch01-02-01-observability.html) for more details on how to configure this directive.
+#
+# @example Setting custom observability configuration
+#   class { 'prosa':
+#     observability => {
+#       'metrics' => {
+#         'stdout' => {
+#           'level' => 'info',
+#         },
+#       },
+#       'traces'  => {
+#         'stdout' => {
+#           'level' => 'info',
+#         },
+#       },
+#       'logs'    => {
+#         'stdout' => {
+#           'level' => 'info',
+#         },
+#       },
+#     }
+#   }
 #
 class prosa (
   String $prosa_name                                              = $prosa::params::prosa_name,
@@ -82,6 +117,7 @@ class prosa (
   String $user                                                    = $prosa::params::user,
   String $group                                                   = $prosa::params::group,
   ProSA::TelemetryLevel $telemetry_level                          = $prosa::params::telemetry_level,
+  Optional[Hash[String, String]] $telemetry_attributes            = undef,
   Hash[String, Hash[String, Hash[String, String]]] $observability = $prosa::params::observability,
 ) inherits prosa::params {
   # declare ProSA user and group
@@ -113,9 +149,10 @@ class prosa (
     group   => $group,
     mode    => '0644',
     content => epp('prosa/prosa.yml.epp', {
-        'prosa_name'      => $prosa_name,
-        'telemetry_level' => $telemetry_level,
-        'observability'   => $observability,
+        'prosa_name'           => $prosa_name,
+        'telemetry_level'      => $telemetry_level,
+        'telemetry_attributes' => $telemetry_attributes,
+        'observability'        => $observability,
     }),
     require => File[$conf_dir],
     notify  => Class['prosa::service'],
