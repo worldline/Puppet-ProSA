@@ -39,6 +39,11 @@
 #   to `false`, which is useful when you want to let the service be managed by another 
 #   application.<br />
 #
+# @param service_limit_nofile
+#   Sets the limit on the number of open file descriptors for the ProSA service.<br />
+#   This parameter corresponds to the `LimitNOFILE` directive in the systemd service unit file.<br />
+#   Apply the default system limit when set to `undef`.
+#
 # @param manage_user
 #   When `false`, stops Puppet from creating the user resource.<br />
 #   This is for instances when you have a user, created from another Puppet module, you want 
@@ -65,7 +70,7 @@
 #
 # @param telemetry_attributes
 #   Configures the ProSA [Telemetry Attributes](https://docs.rs/prosa-utils/latest/prosa_utils/config/observability/struct.Observability.html) directive
-#   which allows to add custom attributes to telemetry messages.
+#   which allows to add custom attributes to telemetry messages.<br />
 #   Refer to the [ProSA book](https://worldline.github.io/ProSA/ch01-02-01-observability.html) for more details on how to configure this directive.
 #
 # @example Setting custom telemetry attributes
@@ -78,7 +83,7 @@
 #
 # @param observability
 #   Configures the ProSA [Observability](https://docs.rs/prosa-utils/latest/prosa_utils/config/observability/struct.Observability.html) directive
-#   which configure metrics, traces and logs export.
+#   which configure metrics, traces and logs export.<br />
 #   Refer to the [ProSA book](https://worldline.github.io/ProSA/ch01-02-01-observability.html) for more details on how to configure this directive.
 #
 # @example Setting custom observability configuration
@@ -112,6 +117,7 @@ class prosa (
   Boolean $service_enable                                         = true,
   Boolean $service_manage                                         = true,
   Variant[Stdlib::Ensure::Service, Boolean] $service_ensure       = 'running',
+  Optional[Integer] $service_limit_nofile                         = undef,
   Boolean $manage_user                                            = true,
   Boolean $manage_group                                           = true,
   String $user                                                    = $prosa::params::user,
@@ -172,14 +178,15 @@ class prosa (
 
   # Declare ProSA service
   class { 'prosa::service':
-    prosa_name     => $prosa_name,
-    service_name   => $service_name,
-    service_binary => $bin_path,
-    app_conf       => $conf_dir,
-    user           => $user,
-    group          => $group,
-    service_enable => $service_enable,
-    service_ensure => $service_ensure,
-    service_manage => $service_manage,
+    prosa_name           => $prosa_name,
+    service_name         => $service_name,
+    service_binary       => $bin_path,
+    app_conf             => $conf_dir,
+    user                 => $user,
+    group                => $group,
+    service_enable       => $service_enable,
+    service_ensure       => $service_ensure,
+    service_manage       => $service_manage,
+    service_limit_nofile => $service_limit_nofile,
   }
 }

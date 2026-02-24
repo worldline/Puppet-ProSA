@@ -19,6 +19,7 @@
 ### Defined types
 
 * [`prosa::proc`](#prosa--proc): Allows specialised configurations for ProSA processors
+Use the `prosa::processors` defined type if you want to create processors
 
 ### Data types
 
@@ -86,6 +87,7 @@ The following parameters are available in the `prosa` class:
 * [`service_enable`](#-prosa--service_enable)
 * [`service_manage`](#-prosa--service_manage)
 * [`service_ensure`](#-prosa--service_ensure)
+* [`service_limit_nofile`](#-prosa--service_limit_nofile)
 * [`manage_user`](#-prosa--manage_user)
 * [`manage_group`](#-prosa--manage_group)
 * [`user`](#-prosa--user)
@@ -172,6 +174,16 @@ application.<br />
 
 Default value: `'running'`
 
+##### <a name="-prosa--service_limit_nofile"></a>`service_limit_nofile`
+
+Data type: `Optional[Integer]`
+
+Sets the limit on the number of open file descriptors for the ProSA service.<br />
+This parameter corresponds to the `LimitNOFILE` directive in the systemd service unit file.<br />
+Apply the default system limit when set to `undef`.
+
+Default value: `undef`
+
 ##### <a name="-prosa--manage_user"></a>`manage_user`
 
 Data type: `Boolean`
@@ -226,7 +238,7 @@ Default value: `$prosa::params::telemetry_level`
 Data type: `Optional[Hash[String, String]]`
 
 Configures the ProSA [Telemetry Attributes](https://docs.rs/prosa-utils/latest/prosa_utils/config/observability/struct.Observability.html) directive
-which allows to add custom attributes to telemetry messages.
+which allows to add custom attributes to telemetry messages.<br />
 Refer to the [ProSA book](https://worldline.github.io/ProSA/ch01-02-01-observability.html) for more details on how to configure this directive.
 
 Default value: `undef`
@@ -236,7 +248,7 @@ Default value: `undef`
 Data type: `Hash[String, Hash[String, Hash[String, String]]]`
 
 Configures the ProSA [Observability](https://docs.rs/prosa-utils/latest/prosa_utils/config/observability/struct.Observability.html) directive
-which configure metrics, traces and logs export.
+which configure metrics, traces and logs export.<br />
 Refer to the [ProSA book](https://worldline.github.io/ProSA/ch01-02-01-observability.html) for more details on how to configure this directive.
 
 Default value: `$prosa::params::observability`
@@ -284,17 +296,7 @@ Default value: `{}`
 ### <a name="prosa--proc"></a>`prosa::proc`
 
 Allows specialised configurations for ProSA processors
-
-#### Examples
-
-##### 
-
-```puppet
-class { 'prosa':
-  default_vhost     => false,
-  default_ssl_vhost => false,
-}
-```
+Use the `prosa::processors` defined type if you want to create processors
 
 #### Parameters
 

@@ -16,14 +16,14 @@ describe 'prosa::processors class' do
 
     pp = <<-MANIFEST
         class { 'prosa':
-          prosa_name      => #{prosa_hash['prosa_name']},
-          service_manage  => false,
-          telemetry_level => 'warn',
+          prosa_name           => #{prosa_hash['prosa_name']},
+          service_manage       => false,
+          telemetry_level      => 'warn',
           telemetry_attributes => {
             'service.name' => 'prosa-service',
             'host.id'      => 'fdbf79e8af94cb7f9e8df36789187052',
           },
-          observability   => {
+          observability        => {
             'metrics' => {
               'prometheus' => {
                 'endpoint' => '0.0.0.0:9090',
