@@ -24,10 +24,6 @@
 
 * [`ProSA::TelemetryLevel`](#ProSA--TelemetryLevel): A string that conforms to the ProSA `TelemetryLevel` syntax.
 
-### Tasks
-
-* [`version`](#version): Gets the ProSA components versions
-
 ## Classes
 
 ### <a name="prosa"></a>`prosa`
@@ -398,20 +394,4 @@ ProSA accept non case sensitive levels (like this type).
   * https://docs.rs/prosa-utils/latest/prosa_utils/config/tracing/enum.TelemetryLevel.html
 
 Alias of `Pattern[/\A(?i:error|warn|info|debug|trace|off)\Z/]`
-
-## Tasks
-
-### <a name="version"></a>`version`
-
-Gets the ProSA components versions
-
-**Supports noop?** false
-
-#### Parameters
-
-##### `node_role`
-
-Data type: `String[1]`
-
-The role of the node joining the swarm
 
