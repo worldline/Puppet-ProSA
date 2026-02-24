@@ -1,11 +1,6 @@
 # @summary
 #   Allows specialised configurations for ProSA processors
-#
-# @example
-#   class { 'prosa':
-#     default_vhost     => false,
-#     default_ssl_vhost => false,
-#   }
+#   Use the `prosa::processors` defined type if you want to create processors
 #
 # @param adaptor_config_path
 #   For some ProSA adaptor, they need to have a configuration in addition to processor.

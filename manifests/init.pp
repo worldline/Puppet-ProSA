@@ -70,7 +70,7 @@
 #
 # @param telemetry_attributes
 #   Configures the ProSA [Telemetry Attributes](https://docs.rs/prosa-utils/latest/prosa_utils/config/observability/struct.Observability.html) directive
-#   which allows to add custom attributes to telemetry messages.
+#   which allows to add custom attributes to telemetry messages.<br />
 #   Refer to the [ProSA book](https://worldline.github.io/ProSA/ch01-02-01-observability.html) for more details on how to configure this directive.
 #
 # @example Setting custom telemetry attributes
@@ -83,7 +83,7 @@
 #
 # @param observability
 #   Configures the ProSA [Observability](https://docs.rs/prosa-utils/latest/prosa_utils/config/observability/struct.Observability.html) directive
-#   which configure metrics, traces and logs export.
+#   which configure metrics, traces and logs export.<br />
 #   Refer to the [ProSA book](https://worldline.github.io/ProSA/ch01-02-01-observability.html) for more details on how to configure this directive.
 #
 # @example Setting custom observability configuration
@@ -178,14 +178,15 @@ class prosa (
 
   # Declare ProSA service
   class { 'prosa::service':
-    prosa_name     => $prosa_name,
-    service_name   => $service_name,
-    service_binary => $bin_path,
-    app_conf       => $conf_dir,
-    user           => $user,
-    group          => $group,
-    service_enable => $service_enable,
-    service_ensure => $service_ensure,
-    service_manage => $service_manage,
+    prosa_name           => $prosa_name,
+    service_name         => $service_name,
+    service_binary       => $bin_path,
+    app_conf             => $conf_dir,
+    user                 => $user,
+    group                => $group,
+    service_enable       => $service_enable,
+    service_ensure       => $service_ensure,
+    service_manage       => $service_manage,
+    service_limit_nofile => $service_limit_nofile,
   }
 }

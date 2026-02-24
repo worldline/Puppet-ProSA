@@ -11,7 +11,8 @@ class prosa::service (
   String $group                            = $prosa::params::group,
   Boolean $service_enable                  = true,
   Variant[Boolean, String] $service_ensure = 'running',
-  Boolean $service_manage                  = true
+  Boolean $service_manage                  = true,
+  Optional[Integer] $service_limit_nofile  = undef
 ) {
   # The base class must be included first because parameter defaults depend on it
   if ! defined(Class['prosa::params']) {
@@ -36,11 +37,12 @@ class prosa::service (
         group   => $prosa::params::root_group,
         mode    => '0644',
         content => epp('prosa/service.epp', {
-            'prosa_name' => $prosa_name,
-            'user'       => $user,
-            'group'      => $group,
-            'bin_path'   => $service_binary,
-            'conf_path'  => $app_conf,
+            'prosa_name'   => $prosa_name,
+            'user'         => $user,
+            'group'        => $group,
+            'bin_path'     => $service_binary,
+            'conf_path'    => $app_conf,
+            'limit_nofile' => $service_limit_nofile,
         }),
         replace => true,
       }
