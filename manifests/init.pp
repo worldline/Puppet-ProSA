@@ -164,6 +164,34 @@ class prosa (
     notify  => Class['prosa::service'],
   }
 
+  if 'metrics' in $observability {
+    if 'prometheus' in $observability['metrics'] {
+      if 'endpoint' in $observability['metrics']['prometheus'] {
+        $prometheus_endpoint = $observability['metrics']['prometheus']['endpoint']
+        $prometheus_port_string = $prometheus_endpoint ? {
+          /^[0-9]+$/   => $prometheus_endpoint,
+          /:([0-9]+)$/ => regsubst($prometheus_endpoint, '^.*:([0-9]+)$', '\1'),
+          default      => fail("Invalid ProSA Prometheus endpoint '${prometheus_endpoint}': expected a port or address ending with :port"),
+        }
+        $prometheus_port = Integer($prometheus_port_string)
+
+        if $prometheus_port < 1 or $prometheus_port > 65535 {
+          fail("Invalid ProSA Prometheus port '${prometheus_port}' extracted from endpoint '${prometheus_endpoint}'")
+        }
+
+        file { '/usr/local/bin/prosa-monitor':
+          ensure  => file,
+          owner   => 'root',
+          group   => $prosa::params::root_group,
+          mode    => '0755',
+          content => epp('prosa/prosa-monitor.py.epp', {
+              'metrics_url' => "http://127.0.0.1:${prometheus_port}/metrics",
+          }),
+        }
+      }
+    }
+  }
+
   # Download ProSA binary from an external binary repository
   if $bin_repo {
     file { $bin_path:

@@ -1,0 +1,620 @@
+<%- | String $metrics_url = 'http://127.0.0.1:9090/metrics' | -%>
+#!/usr/bin/env python3
+"""Display ProSA Prometheus metrics in a terminal."""
+
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import math
+import os
+import re
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from dataclasses import dataclass
+from typing import Iterable
+
+
+# Puppet/Jinja integration point: template these defaults per deployed service.
+# Operators can still override them at runtime with CLI flags or PROSA_METRICS_URL.
+DEFAULT_METRICS_URL = "<%= $metrics_url %>"
+DEFAULT_TIMEOUT_SECONDS = 5.0
+DEFAULT_WATCH_SECONDS: float | None = None
+DEFAULT_NO_COLOR = False
+
+# ProSA emits these metric families from prosa/src/core/main.rs and
+# prosa/src/core/service.rs. Other Prometheus/OpenTelemetry metrics are ignored
+# so the terminal view stays focused on the framework state.
+METRIC_NAMES = {"prosa_processors", "prosa_main_ram", "prosa_services"}
+ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+@dataclass(frozen=True)
+class Sample:
+    name: str
+    labels: dict[str, str]
+    value: float
+
+
+@dataclass
+class Processor:
+    proc_id: str
+    title: str
+    state: str
+    restarts: int
+    queues: int | None
+    color: str
+
+
+@dataclass
+class Service:
+    service_id: str
+    title: str
+    state: str
+    providers: int
+    color: str
+
+
+@dataclass(frozen=True, order=True)
+class GroupKey:
+    service_name: str
+    service_namespace: str
+    host_name: str
+    instance: str
+
+
+class MetricsError(Exception):
+    """Raised when metrics cannot be fetched or parsed."""
+
+
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Render ProSA Prometheus metrics without Grafana.",
+    )
+    parser.add_argument(
+        "url",
+        nargs="?",
+        default=os.environ.get("PROSA_METRICS_URL", DEFAULT_METRICS_URL),
+        help="ProSA local Prometheus metrics URL. Default: %(default)s",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=DEFAULT_TIMEOUT_SECONDS,
+        help="HTTP timeout in seconds.",
+    )
+    parser.add_argument(
+        "--watch",
+        type=float,
+        default=DEFAULT_WATCH_SECONDS,
+        metavar="SECONDS",
+        help="Refresh the display every SECONDS.",
+    )
+    parser.add_argument(
+        "--no-color",
+        action="store_true",
+        default=DEFAULT_NO_COLOR,
+        help="Disable ANSI colors.",
+    )
+    return parser.parse_args(argv)
+
+
+def validate_http_url(url: str) -> None:
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise MetricsError("URL must be an http:// or https:// endpoint")
+
+
+def fetch_text(url: str, timeout: float) -> str:
+    validate_http_url(url)
+    request = urllib.request.Request(
+        url,
+        headers={
+            "Accept": "text/plain, application/openmetrics-text",
+            "User-Agent": "prosa-monitor/1",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            body = response.read()
+            charset = response.headers.get_content_charset() or "utf-8"
+            return body.decode(charset, errors="replace")
+    except urllib.error.URLError as err:
+        raise MetricsError(f"failed to fetch metrics from {url}: {err}") from err
+
+
+def load_samples(url: str, timeout: float) -> list[Sample]:
+    text = fetch_text(url, timeout)
+    return filter_samples(parse_prometheus_text(text))
+
+
+def parse_prometheus_text(text: str) -> list[Sample]:
+    samples: list[Sample] = []
+    for line in text.splitlines():
+        parsed = parse_metric_line(line.strip())
+        if parsed is not None:
+            samples.append(parsed)
+    return samples
+
+
+def parse_metric_line(line: str) -> Sample | None:
+    if not line or line.startswith("#"):
+        return None
+
+    # The Prometheus text format is intentionally parsed locally to keep this
+    # script dependency-free for package-managed hosts.
+    if "{" in line and line.find("{") < first_space_index(line):
+        name, rest = line.split("{", 1)
+        label_text, rest = split_labels(rest)
+        labels = parse_labels(label_text)
+        parts = rest.strip().split()
+    else:
+        parts = line.split()
+        if not parts:
+            return None
+        name = parts.pop(0)
+        labels = {}
+
+    if len(parts) < 1:
+        return None
+
+    try:
+        value = parse_float(parts[0])
+    except ValueError:
+        return None
+
+    return Sample(name=name, labels=labels, value=value)
+
+
+def first_space_index(text: str) -> int:
+    positions = [idx for idx in (text.find(" "), text.find("\t")) if idx >= 0]
+    return min(positions) if positions else len(text)
+
+
+def split_labels(text: str) -> tuple[str, str]:
+    in_quotes = False
+    escaped = False
+    for index, char in enumerate(text):
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\" and in_quotes:
+            escaped = True
+            continue
+        if char == '"':
+            in_quotes = not in_quotes
+            continue
+        if char == "}" and not in_quotes:
+            return text[:index], text[index + 1 :]
+
+    raise MetricsError("invalid Prometheus metric line: unterminated label set")
+
+
+def parse_labels(text: str) -> dict[str, str]:
+    labels: dict[str, str] = {}
+    index = 0
+    length = len(text)
+    while index < length:
+        while index < length and text[index] in " ,":
+            index += 1
+        if index >= length:
+            break
+
+        key_start = index
+        while index < length and text[index] not in "= ":
+            index += 1
+        key = text[key_start:index]
+        while index < length and text[index] == " ":
+            index += 1
+        if index >= length or text[index] != "=":
+            raise MetricsError(f"invalid Prometheus label near {text[key_start:]!r}")
+        index += 1
+        while index < length and text[index] == " ":
+            index += 1
+        if index >= length or text[index] != '"':
+            raise MetricsError(f"invalid Prometheus label value for {key!r}")
+        index += 1
+
+        value_chars: list[str] = []
+        while index < length:
+            char = text[index]
+            index += 1
+            if char == "\\":
+                if index >= length:
+                    value_chars.append("\\")
+                    break
+                escaped = text[index]
+                index += 1
+                if escaped == "n":
+                    value_chars.append("\n")
+                elif escaped == "t":
+                    value_chars.append("\t")
+                else:
+                    value_chars.append(escaped)
+            elif char == '"':
+                break
+            else:
+                value_chars.append(char)
+        labels[key] = "".join(value_chars)
+
+        while index < length and text[index] == " ":
+            index += 1
+        if index < length and text[index] == ",":
+            index += 1
+
+    return labels
+
+
+def parse_float(value: str) -> float:
+    if value == "+Inf":
+        return math.inf
+    if value == "-Inf":
+        return -math.inf
+    return float(value)
+
+
+def metric_int(value: float) -> int | None:
+    """Return an integer metric value, or None for non-finite/sentinel input."""
+    if not math.isfinite(value):
+        return None
+    return int(value)
+
+
+def filter_samples(samples: Iterable[Sample]) -> list[Sample]:
+    return [sample for sample in samples if sample.name in METRIC_NAMES]
+
+
+def group_key(labels: dict[str, str]) -> GroupKey:
+    return GroupKey(
+        service_name=labels.get("service_name", ""),
+        service_namespace=labels.get("service_namespace", ""),
+        host_name=labels.get("host_name", ""),
+        instance=labels.get("instance", ""),
+    )
+
+
+def group_samples(samples: Iterable[Sample]) -> dict[GroupKey, list[Sample]]:
+    groups: dict[GroupKey, list[Sample]] = {}
+    for sample in samples:
+        groups.setdefault(group_key(sample.labels), []).append(sample)
+    return groups
+
+
+def build_processors(samples: Iterable[Sample]) -> dict[str, Processor]:
+    node_values: dict[str, Sample] = {}
+    queue_values: dict[str, int] = {}
+
+    for sample in samples:
+        if sample.name != "prosa_processors":
+            continue
+        proc_id = sample.labels.get("id", "?")
+        metric_type = sample.labels.get("type", "")
+        if metric_type == "node":
+            node_values[proc_id] = sample
+        elif metric_type == "queues":
+            if (queue_count := metric_int(sample.value)) is not None:
+                queue_values[proc_id] = queue_count
+
+    processors: dict[str, Processor] = {}
+    for proc_id, sample in sorted(node_values.items(), key=lambda item: natural_key(item[0])):
+        state, restarts, color = processor_state(sample.value)
+        processors[proc_id] = Processor(
+            proc_id=proc_id,
+            title=sample.labels.get("title", proc_id),
+            state=state,
+            restarts=restarts,
+            queues=queue_values.get(proc_id),
+            color=color,
+        )
+
+    return processors
+
+
+def processor_state(value: float) -> tuple[str, int, str]:
+    # prosa_processors{type="node"} uses: -2 crashed, -1 stopped, 0 running,
+    # and positive values for the restart count after a recoverable failure.
+    if not math.isfinite(value):
+        return "unknown", 0, "yellow"
+    if value <= -2:
+        return "crashed", 0, "red"
+    if value == -1:
+        return "stopped", 0, "gray"
+    if value == 0:
+        return "running", 0, "green"
+    return "running after restart", int(value), "yellow"
+
+
+def build_services(samples: Iterable[Sample]) -> tuple[dict[str, Service], list[tuple[str, str]]]:
+    services: dict[str, Service] = {}
+    links: list[tuple[str, str]] = []
+
+    for sample in samples:
+        if sample.name != "prosa_services":
+            continue
+
+        metric_type = sample.labels.get("type", "")
+        if metric_type == "node":
+            service_id = sample.labels.get("id", "?")
+            providers = metric_int(sample.value)
+            if providers is None:
+                continue
+            state = "up" if providers > 0 else "down"
+            services[service_id] = Service(
+                service_id=service_id,
+                title=sample.labels.get("title", service_id),
+                state=state,
+                providers=providers,
+                color="green" if providers > 0 else "gray",
+            )
+        elif metric_type == "link":
+            source = sample.labels.get("source")
+            target = sample.labels.get("target")
+            if source and target:
+                links.append((source, target))
+
+    links.sort(key=lambda link: (natural_key(link[0]), natural_key(link[1])))
+    return services, links
+
+
+def natural_key(value: str) -> tuple[int, int | str]:
+    return (0, int(value)) if value.isdecimal() else (1, value)
+
+
+def render(samples: list[Sample], url: str, use_color: bool) -> str:
+    groups = group_samples(samples)
+    if not groups:
+        return f"No ProSA metrics found at {url}"
+
+    lines: list[str] = []
+    now = dt.datetime.now().astimezone().replace(microsecond=0).isoformat()
+    lines.append("ProSA metrics")
+    lines.append(f"Endpoint: {url}")
+    lines.append(f"Observed: {now}")
+
+    for index, (key, group) in enumerate(sorted(groups.items(), key=lambda item: item[0])):
+        if index:
+            lines.append("")
+        lines.extend(render_group(key, group, use_color))
+
+    return "\n".join(lines)
+
+
+def render_group(key: GroupKey, samples: list[Sample], use_color: bool) -> list[str]:
+    lines: list[str] = []
+    title = group_title(key, samples)
+    lines.append(f"Instance: {title}")
+    lines.append("")
+    lines.extend(render_ram(samples))
+    lines.append("")
+    processors = build_processors(samples)
+    services, links = build_services(samples)
+    lines.extend(render_processors(processors, use_color))
+    # Render service nodes even without link samples so down/unlinked services
+    # remain visible in terminal output.
+    if services or links:
+        lines.append("")
+        lines.extend(render_graph(processors, services, links, use_color))
+    return lines
+
+
+def group_title(key: GroupKey, samples: Iterable[Sample]) -> str:
+    parts = []
+    if key.service_namespace:
+        parts.append(key.service_namespace)
+    if key.service_name:
+        parts.append(key.service_name)
+    if key.host_name:
+        parts.append(f"host={key.host_name}")
+    elif key.instance:
+        parts.append(f"instance={key.instance}")
+
+    if not parts:
+        parts.append("unknown")
+
+    version = next(
+        (
+            sample.labels["service_version"]
+            for sample in samples
+            if "service_version" in sample.labels
+        ),
+        "",
+    )
+    if version:
+        parts.append(f"version={version}")
+    return " ".join(parts)
+
+
+def render_ram(samples: Iterable[Sample]) -> list[str]:
+    ram = {
+        sample.labels.get("type", "unknown"): sample.value
+        for sample in samples
+        if sample.name == "prosa_main_ram"
+    }
+    lines = ["RAM"]
+    if not ram:
+        lines.append("  no prosa_main_ram samples")
+        return lines
+
+    for ram_type in ("physical", "virtual"):
+        if ram_type in ram:
+            lines.append(f"  {ram_type:<8} {format_bytes(ram[ram_type]):>10}")
+
+    for ram_type in sorted(set(ram) - {"physical", "virtual"}):
+        lines.append(f"  {ram_type:<8} {format_bytes(ram[ram_type]):>10}")
+    return lines
+
+
+def render_processors(processors: dict[str, Processor], use_color: bool) -> list[str]:
+    lines = ["Processors"]
+    if not processors:
+        lines.append("  no prosa_processors node samples")
+        return lines
+
+    rows = []
+    for processor in processors.values():
+        rows.append(
+            [
+                processor.proc_id,
+                processor.title,
+                colorize(processor.state, processor.color, use_color),
+                str(processor.restarts),
+                "-" if processor.queues is None else str(processor.queues),
+            ]
+        )
+    lines.extend(format_table(["ID", "Processor", "State", "Restarts", "Queues"], rows, "  "))
+    return lines
+
+
+def render_graph(
+    processors: dict[str, Processor],
+    services: dict[str, Service],
+    links: list[tuple[str, str]],
+    use_color: bool,
+) -> list[str]:
+    lines = ["Node graph"]
+    if not processors and not services:
+        lines.append("  no graph nodes")
+        return lines
+
+    linked_services = {source for source, _ in links}
+    for service in sorted(services.values(), key=lambda item: natural_key(item.service_id)):
+        lines.append(f"  {service_node(service, use_color)}")
+        service_links = [target for source, target in links if source == service.service_id]
+        if not service_links:
+            lines.append("      -> no linked processor")
+            continue
+        for target in service_links:
+            processor = processors.get(target)
+            if processor is None:
+                lines.append(f"      -> [Processor {target}] missing prosa_processors node")
+            else:
+                lines.append(f"      -> {processor_node(processor, use_color)}")
+
+    for service_id in sorted(linked_services - set(services), key=natural_key):
+        lines.append(f"  [Service {service_id}] missing prosa_services node")
+        for source, target in links:
+            if source == service_id:
+                processor = processors.get(target)
+                target_node = (
+                    f"[Processor {target}] missing prosa_processors node"
+                    if processor is None
+                    else processor_node(processor, use_color)
+                )
+                lines.append(f"      -> {target_node}")
+
+    unlinked_processors = [
+        processor
+        for proc_id, processor in processors.items()
+        if proc_id not in {target for _, target in links}
+    ]
+    if unlinked_processors:
+        lines.append("  unlinked processors")
+        for processor in unlinked_processors:
+            lines.append(f"      {processor_node(processor, use_color)}")
+
+    return lines
+
+
+def processor_node(processor: Processor, _use_color: bool) -> str:
+    return f"[Processor {processor.title}]"
+
+
+def service_node(service: Service, use_color: bool) -> str:
+    state = colorize(service.state, service.color, use_color)
+    return f"[Service {service.title}] {state} providers={service.providers}"
+
+
+def format_bytes(value: float) -> str:
+    units = ("B", "KiB", "MiB", "GiB", "TiB")
+    size = float(value)
+    for unit in units:
+        if abs(size) < 1024 or unit == units[-1]:
+            if unit == "B":
+                return f"{size:.0f} {unit}"
+            return f"{size:.2f} {unit}"
+        size /= 1024
+    return f"{size:.2f} TiB"
+
+
+def format_table(headers: list[str], rows: list[list[str]], prefix: str) -> list[str]:
+    widths = [
+        max(visible_len(row[index]) for row in [headers, *rows])
+        for index in range(len(headers))
+    ]
+    lines = [prefix + format_table_row(headers, widths)]
+    for row in rows:
+        lines.append(prefix + format_table_row(row, widths))
+    return lines
+
+
+def format_table_row(row: list[str], widths: list[int]) -> str:
+    cells = [
+        pad(row[index], widths[index]) if index < len(row) - 1 else row[index]
+        for index in range(len(row))
+    ]
+    return "  ".join(cells)
+
+
+def visible_len(text: str) -> int:
+    return len(ANSI_RE.sub("", text))
+
+
+def pad(text: str, width: int) -> str:
+    return text + " " * max(0, width - visible_len(text))
+
+
+def colorize(text: str, color: str, use_color: bool) -> str:
+    if not use_color:
+        return text
+
+    colors = {
+        "red": "31",
+        "green": "32",
+        "yellow": "33",
+        "gray": "90",
+    }
+    code = colors.get(color)
+    return f"\x1b[{code}m{text}\x1b[0m" if code else text
+
+
+def supports_color(no_color: bool) -> bool:
+    return not no_color and "NO_COLOR" not in os.environ and sys.stdout.isatty()
+
+
+def run_once(args: argparse.Namespace) -> str:
+    samples = load_samples(args.url, args.timeout)
+    return render(samples, args.url, supports_color(args.no_color))
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(sys.argv[1:] if argv is None else argv)
+
+    if args.watch is not None and args.watch <= 0:
+        raise MetricsError("--watch must be greater than 0")
+
+    while True:
+        try:
+            output = run_once(args)
+        except MetricsError as err:
+            if args.watch is None:
+                print(f"error: {err}", file=sys.stderr)
+                return 2
+            output = f"error: {err}"
+
+        if args.watch is not None:
+            print("\x1b[H\x1b[J", end="")
+        print(output, flush=True)
+
+        if args.watch is None:
+            return 0
+        time.sleep(args.watch)
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except KeyboardInterrupt:
+        raise SystemExit(130)
