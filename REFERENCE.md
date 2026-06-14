@@ -82,6 +82,7 @@ The following parameters are available in the `prosa` class:
 * [`service_name`](#-prosa--service_name)
 * [`bin_repo`](#-prosa--bin_repo)
 * [`bin_path`](#-prosa--bin_path)
+* [`monitor_path`](#-prosa--monitor_path)
 * [`log_dir`](#-prosa--log_dir)
 * [`conf_dir`](#-prosa--conf_dir)
 * [`service_enable`](#-prosa--service_enable)
@@ -129,6 +130,14 @@ Data type: `Stdlib::Absolutepath`
 Sets the path where the ProSA binary will be located.
 
 Default value: `$prosa::params::bin_path`
+
+##### <a name="-prosa--monitor_path"></a>`monitor_path`
+
+Data type: `Stdlib::Absolutepath`
+
+Sets the path where the ProSA monitoring script will be located.
+
+Default value: `$prosa::params::monitor_path`
 
 ##### <a name="-prosa--log_dir"></a>`log_dir`
 
