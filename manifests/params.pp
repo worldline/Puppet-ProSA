@@ -12,6 +12,7 @@ class prosa::params {
   $prosa_name      = regsubst("prosa-${servername}", '[ \t.:/]+', '_', 'G')
   $service_name    = 'prosa'
   $bin_path        = '/usr/local/bin/prosa'
+  $monitor_path    = '/usr/local/bin/prosa-monitor'
   $conf_dir        = '/etc/prosa'
   $user            = 'prosa'
   $group           = 'prosa'

@@ -20,6 +20,9 @@
 # @param bin_path
 #   Sets the path where the ProSA binary will be located.
 #
+# @param monitor_path
+#   Sets the path where the ProSA monitoring script will be located.
+#
 # @param log_dir
 #   Sets the directory where the ProSA logs files are located.
 #
@@ -112,6 +115,7 @@ class prosa (
   String $service_name                                            = $prosa::params::service_name,
   Optional[String] $bin_repo                                      = undef,
   Stdlib::Absolutepath $bin_path                                  = $prosa::params::bin_path,
+  Stdlib::Absolutepath $monitor_path                              = $prosa::params::monitor_path,
   Stdlib::Absolutepath $log_dir                                   = '/var/log',
   Stdlib::Absolutepath $conf_dir                                  = $prosa::params::conf_dir,
   Boolean $service_enable                                         = true,
@@ -164,31 +168,32 @@ class prosa (
     notify  => Class['prosa::service'],
   }
 
-  if 'metrics' in $observability {
-    if 'prometheus' in $observability['metrics'] {
-      if 'endpoint' in $observability['metrics']['prometheus'] {
-        $prometheus_endpoint = $observability['metrics']['prometheus']['endpoint']
-        $prometheus_port_string = $prometheus_endpoint ? {
-          /^[0-9]+$/   => $prometheus_endpoint,
-          /:([0-9]+)$/ => regsubst($prometheus_endpoint, '^.*:([0-9]+)$', '\1'),
-          default      => fail("Invalid ProSA Prometheus endpoint '${prometheus_endpoint}': expected a port or address ending with :port"),
-        }
-        $prometheus_port = Integer($prometheus_port_string)
+  # Create a ProSA monitoring script only if Prometheus is locally configure
+  if (
+    'metrics' in $observability
+    and 'prometheus' in $observability['metrics']
+    and 'endpoint' in $observability['metrics']['prometheus']
+  ) {
+    $prometheus_endpoint = $observability['metrics']['prometheus']['endpoint']
+    $prometheus_port_string = $prometheus_endpoint ? {
+      /^[0-9]+$/   => $prometheus_endpoint,
+      /:([0-9]+)$/ => regsubst($prometheus_endpoint, '^.*:([0-9]+)$', '\1'),
+      default      => fail("Invalid ProSA Prometheus endpoint '${prometheus_endpoint}': expected a port or address ending with :port"),
+    }
+    $prometheus_port = Integer($prometheus_port_string)
 
-        if $prometheus_port < 1 or $prometheus_port > 65535 {
-          fail("Invalid ProSA Prometheus port '${prometheus_port}' extracted from endpoint '${prometheus_endpoint}'")
-        }
+    if $prometheus_port < 1 or $prometheus_port > 65535 {
+      fail("Invalid ProSA Prometheus port '${prometheus_port}' extracted from endpoint '${prometheus_endpoint}'")
+    }
 
-        file { '/usr/local/bin/prosa-monitor':
-          ensure  => file,
-          owner   => 'root',
-          group   => $prosa::params::root_group,
-          mode    => '0755',
-          content => epp('prosa/prosa-monitor.py.epp', {
-              'metrics_url' => "http://127.0.0.1:${prometheus_port}/metrics",
-          }),
-        }
-      }
+    file { $monitor_path:
+      ensure  => file,
+      owner   => 'root',
+      group   => $prosa::params::root_group,
+      mode    => '0755',
+      content => epp('prosa/prosa-monitor.py.epp', {
+          'metrics_url' => "http://127.0.0.1:${prometheus_port}/metrics",
+      }),
     }
   }
 
