@@ -58,6 +58,9 @@ For more details on configuration, please refer to the [ProSA configuration guid
 class { 'prosa':
   bin_repo        => 'https://user:password@binary.repo.com/repository/prosa-1.0.0.bin',
   telemetry_level => 'info',
+  telemetry_attributes => {
+    'service.name' => "prosa-servicename",
+  },
   observability   => {
     'metrics' => {
       'otlp' => {
