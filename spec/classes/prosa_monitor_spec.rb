@@ -102,5 +102,26 @@ describe 'prosa' do
       _out, _err, status = run_monitor('--check', "http://127.0.0.1:#{port}/metrics")
       expect(status.exitstatus).to eq(2)
     end
+
+    it 'fails when the connection is reset' do
+      server = TCPServer.new('127.0.0.1', 0)
+      thread = Thread.new do
+        client = server.accept
+        client.setsockopt(Socket::SOL_SOCKET, Socket::SO_LINGER, [1, 0].pack('ii'))
+        client.readpartial(1024)
+        client.close
+      end
+      _out, err, status = run_monitor('--check', "http://127.0.0.1:#{server.addr[1]}/metrics")
+      thread.join
+      server.close
+      expect(status.exitstatus).to eq(2)
+      expect(err).not_to include('Traceback')
+    end
+
+    it 'rejects a non positive watch interval' do
+      _out, err, status = run_monitor('--watch', '0')
+      expect(status.exitstatus).to eq(2)
+      expect(err).not_to include('Traceback')
+    end
   end
 end

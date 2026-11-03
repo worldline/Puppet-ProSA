@@ -4,12 +4,12 @@
 
 import argparse
 import datetime as dt
+import http.client
 import math
 import os
 import re
 import sys
 import time
-import urllib.error
 import urllib.parse
 import urllib.request
 from typing import Dict, Iterable, List, NamedTuple, Optional, Tuple, Union
@@ -124,7 +124,7 @@ def fetch_text(url: str, timeout: float) -> str:
             body = response.read()
             charset = response.headers.get_content_charset() or "utf-8"
             return body.decode(charset, errors="replace")
-    except urllib.error.URLError as err:
+    except (OSError, http.client.HTTPException) as err:
         raise MetricsError(f"failed to fetch metrics from {url}: {err}") from err
 
 
@@ -628,10 +628,11 @@ def run_check(args: argparse.Namespace) -> int:
 def main(argv: Optional[List[str]] = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
 
-    if args.watch is not None and args.watch <= 0:
-        raise MetricsError("--watch must be greater than 0")
     if args.check and args.watch is not None:
         print("error: --check cannot be used with --watch", file=sys.stderr)
+        return EXIT_ERROR
+    if args.watch is not None and args.watch <= 0:
+        print("error: --watch must be greater than 0", file=sys.stderr)
         return EXIT_ERROR
 
     if args.check:

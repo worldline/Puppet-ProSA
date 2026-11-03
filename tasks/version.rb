@@ -2,7 +2,7 @@
 
 require 'json'
 require 'open3'
-require 'puppet'
+require 'time'
 
 PROSA_BIN = '/usr/local/bin/prosa'.freeze
 
@@ -63,21 +63,19 @@ result = {
 }
 
 begin
-  unless File.executable?(PROSA_BIN)
-    result[:status] = 'error'
-    result[:error] = "Binary not found or not executable: #{PROSA_BIN}"
-    puts result.to_json
-    exit 1
-  end
+  if File.executable?(PROSA_BIN)
+    stdout, stderr, status = Open3.capture3(PROSA_BIN, '--version')
 
-  stdout, stderr, status = Open3.capture3(PROSA_BIN, '--version')
-
-  if status.success?
-    result[:status] = 'success'
-    result.merge!(parse_prosa_version(stdout))
+    if status.success?
+      result[:status] = 'success'
+      result.merge!(parse_prosa_version(stdout))
+    else
+      result[:status] = 'error'
+      result[:error] = stderr.strip
+    end
   else
     result[:status] = 'error'
-    result[:error] = stderr.strip
+    result[:error] = "Binary not found or not executable: #{PROSA_BIN}"
   end
 rescue => e
   result[:status] = 'error'
@@ -85,3 +83,4 @@ rescue => e
 end
 
 puts JSON.pretty_generate(result)
+exit 1 if result[:status] == 'error'

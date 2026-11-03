@@ -26,12 +26,13 @@ exit_code = 2
 begin
   if File.executable?(monitor_path)
     stdout, stderr, status = Open3.capture3(monitor_path, '--check')
-    exit_code = status.exitstatus || 2
-    case exit_code
-    when EXIT_READY
+    state = [status.exitstatus, stdout.strip]
+    if state == [EXIT_READY, 'ready']
       result[:status] = 'ready'
-    when EXIT_NOT_READY
+      exit_code = EXIT_READY
+    elsif state == [EXIT_NOT_READY, 'not ready']
       result[:status] = 'not_ready'
+      exit_code = EXIT_NOT_READY
     else
       result[:status] = 'error'
       result[:error] = stderr.strip.empty? ? stdout.strip : stderr.strip

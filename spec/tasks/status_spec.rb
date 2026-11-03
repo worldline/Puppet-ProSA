@@ -40,6 +40,11 @@ describe 'prosa::status task' do
     expect([result['status'], result['error'], code]).to eq(['error', 'no prosa_ready metric', 2])
   end
 
+  it 'reports a monitor crash as an error' do
+    result, code = run_task(monitor_path: monitor_stub('Traceback', 1))
+    expect([result['status'], code]).to eq(['error', 2])
+  end
+
   it 'fails when the monitoring script is missing' do
     result, code = run_task(monitor_path: File.join(dir, 'missing'))
     expect([result['status'], code]).to eq(['error', 2])
