@@ -1,0 +1,10 @@
+{
+  "description": "Checks whether ProSA is ready to serve requests, using the prosa_ready metric. Fails if ProSA is not ready.",
+  "input_method": "stdin",
+  "parameters": {
+    "monitor_path": {
+      "description": "Path of the ProSA monitoring script (default: /usr/local/bin/prosa-monitor)",
+      "type": "Optional[String[1]]"
+    }
+  }
+}

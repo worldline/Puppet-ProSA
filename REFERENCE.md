@@ -25,6 +25,11 @@ Use the `prosa::processors` defined type if you want to create processors
 
 * [`ProSA::TelemetryLevel`](#ProSA--TelemetryLevel): A string that conforms to the ProSA `TelemetryLevel` syntax.
 
+### Tasks
+
+* [`status`](#status): Checks whether ProSA is ready to serve requests, using the prosa_ready metric. Fails if ProSA is not ready.
+* [`version`](#version): Gets the ProSA components versions
+
 ## Classes
 
 ### <a name="prosa"></a>`prosa`
@@ -394,4 +399,26 @@ ProSA accept non case sensitive levels (like this type).
   * https://docs.rs/prosa-utils/latest/prosa_utils/config/tracing/enum.TelemetryLevel.html
 
 Alias of `Pattern[/\A(?i:error|warn|info|debug|trace|off)\Z/]`
+
+## Tasks
+
+### <a name="status"></a>`status`
+
+Checks whether ProSA is ready to serve requests, using the prosa_ready metric. Fails if ProSA is not ready.
+
+**Supports noop?** false
+
+#### Parameters
+
+##### `monitor_path`
+
+Data type: `Optional[String[1]]`
+
+Path of the ProSA monitoring script (default: /usr/local/bin/prosa-monitor)
+
+### <a name="version"></a>`version`
+
+Gets the ProSA components versions
+
+**Supports noop?** false
 

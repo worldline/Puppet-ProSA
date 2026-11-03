@@ -2,8 +2,6 @@
 #!/usr/bin/env python3
 """Display ProSA Prometheus metrics in a terminal."""
 
-from __future__ import annotations
-
 import argparse
 import datetime as dt
 import math
@@ -14,43 +12,43 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from dataclasses import dataclass
-from typing import Iterable
+from typing import Dict, Iterable, List, NamedTuple, Optional, Tuple, Union
 
 
 # Puppet/Jinja integration point: template these defaults per deployed service.
 # Operators can still override them at runtime with CLI flags or PROSA_METRICS_URL.
 DEFAULT_METRICS_URL = "<%= $metrics_url %>"
 DEFAULT_TIMEOUT_SECONDS = 5.0
-DEFAULT_WATCH_SECONDS: float | None = None
+DEFAULT_WATCH_SECONDS = None  # type: Optional[float]
 DEFAULT_NO_COLOR = False
 
 # ProSA emits these metric families from prosa/src/core/main.rs and
 # prosa/src/core/service.rs. Other Prometheus/OpenTelemetry metrics are ignored
 # so the terminal view stays focused on the framework state.
-METRIC_NAMES = {"prosa_processors", "prosa_main_ram", "prosa_services"}
+METRIC_NAMES = {"prosa_processors", "prosa_main_ram", "prosa_services", "prosa_ready"}
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
+EXIT_READY = 0
+EXIT_NOT_READY = 1
+EXIT_ERROR = 2
 
-@dataclass(frozen=True)
-class Sample:
+
+class Sample(NamedTuple):
     name: str
-    labels: dict[str, str]
+    labels: Dict[str, str]
     value: float
 
 
-@dataclass
-class Processor:
+class Processor(NamedTuple):
     proc_id: str
     title: str
     state: str
     restarts: int
-    queues: int | None
+    queues: Optional[int]
     color: str
 
 
-@dataclass
-class Service:
+class Service(NamedTuple):
     service_id: str
     title: str
     state: str
@@ -58,8 +56,7 @@ class Service:
     color: str
 
 
-@dataclass(frozen=True, order=True)
-class GroupKey:
+class GroupKey(NamedTuple):
     service_name: str
     service_namespace: str
     host_name: str
@@ -70,7 +67,7 @@ class MetricsError(Exception):
     """Raised when metrics cannot be fetched or parsed."""
 
 
-def parse_args(argv: list[str]) -> argparse.Namespace:
+def parse_args(argv: List[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Render ProSA Prometheus metrics without Grafana.",
     )
@@ -99,6 +96,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         default=DEFAULT_NO_COLOR,
         help="Disable ANSI colors.",
     )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Print only the readiness state. Exit 0 if ready, 1 if not ready, 2 on error.",
+    )
     return parser.parse_args(argv)
 
 
@@ -126,13 +128,13 @@ def fetch_text(url: str, timeout: float) -> str:
         raise MetricsError(f"failed to fetch metrics from {url}: {err}") from err
 
 
-def load_samples(url: str, timeout: float) -> list[Sample]:
+def load_samples(url: str, timeout: float) -> List[Sample]:
     text = fetch_text(url, timeout)
     return filter_samples(parse_prometheus_text(text))
 
 
-def parse_prometheus_text(text: str) -> list[Sample]:
-    samples: list[Sample] = []
+def parse_prometheus_text(text: str) -> List[Sample]:
+    samples = []  # type: List[Sample]
     for line in text.splitlines():
         parsed = parse_metric_line(line.strip())
         if parsed is not None:
@@ -140,7 +142,7 @@ def parse_prometheus_text(text: str) -> list[Sample]:
     return samples
 
 
-def parse_metric_line(line: str) -> Sample | None:
+def parse_metric_line(line: str) -> Optional[Sample]:
     if not line or line.startswith("#"):
         return None
 
@@ -174,7 +176,7 @@ def first_space_index(text: str) -> int:
     return min(positions) if positions else len(text)
 
 
-def split_labels(text: str) -> tuple[str, str]:
+def split_labels(text: str) -> Tuple[str, str]:
     in_quotes = False
     escaped = False
     for index, char in enumerate(text):
@@ -193,8 +195,8 @@ def split_labels(text: str) -> tuple[str, str]:
     raise MetricsError("invalid Prometheus metric line: unterminated label set")
 
 
-def parse_labels(text: str) -> dict[str, str]:
-    labels: dict[str, str] = {}
+def parse_labels(text: str) -> Dict[str, str]:
+    labels = {}  # type: Dict[str, str]
     index = 0
     length = len(text)
     while index < length:
@@ -218,7 +220,7 @@ def parse_labels(text: str) -> dict[str, str]:
             raise MetricsError(f"invalid Prometheus label value for {key!r}")
         index += 1
 
-        value_chars: list[str] = []
+        value_chars = []  # type: List[str]
         while index < length:
             char = text[index]
             index += 1
@@ -256,18 +258,18 @@ def parse_float(value: str) -> float:
     return float(value)
 
 
-def metric_int(value: float) -> int | None:
+def metric_int(value: float) -> Optional[int]:
     """Return an integer metric value, or None for non-finite/sentinel input."""
     if not math.isfinite(value):
         return None
     return int(value)
 
 
-def filter_samples(samples: Iterable[Sample]) -> list[Sample]:
+def filter_samples(samples: Iterable[Sample]) -> List[Sample]:
     return [sample for sample in samples if sample.name in METRIC_NAMES]
 
 
-def group_key(labels: dict[str, str]) -> GroupKey:
+def group_key(labels: Dict[str, str]) -> GroupKey:
     return GroupKey(
         service_name=labels.get("service_name", ""),
         service_namespace=labels.get("service_namespace", ""),
@@ -276,16 +278,16 @@ def group_key(labels: dict[str, str]) -> GroupKey:
     )
 
 
-def group_samples(samples: Iterable[Sample]) -> dict[GroupKey, list[Sample]]:
-    groups: dict[GroupKey, list[Sample]] = {}
+def group_samples(samples: Iterable[Sample]) -> Dict[GroupKey, List[Sample]]:
+    groups = {}  # type: Dict[GroupKey, List[Sample]]
     for sample in samples:
         groups.setdefault(group_key(sample.labels), []).append(sample)
     return groups
 
 
-def build_processors(samples: Iterable[Sample]) -> dict[str, Processor]:
-    node_values: dict[str, Sample] = {}
-    queue_values: dict[str, int] = {}
+def build_processors(samples: Iterable[Sample]) -> Dict[str, Processor]:
+    node_values = {}  # type: Dict[str, Sample]
+    queue_values = {}  # type: Dict[str, int]
 
     for sample in samples:
         if sample.name != "prosa_processors":
@@ -295,10 +297,11 @@ def build_processors(samples: Iterable[Sample]) -> dict[str, Processor]:
         if metric_type == "node":
             node_values[proc_id] = sample
         elif metric_type == "queues":
-            if (queue_count := metric_int(sample.value)) is not None:
+            queue_count = metric_int(sample.value)
+            if queue_count is not None:
                 queue_values[proc_id] = queue_count
 
-    processors: dict[str, Processor] = {}
+    processors = {}  # type: Dict[str, Processor]
     for proc_id, sample in sorted(node_values.items(), key=lambda item: natural_key(item[0])):
         state, restarts, color = processor_state(sample.value)
         processors[proc_id] = Processor(
@@ -313,7 +316,7 @@ def build_processors(samples: Iterable[Sample]) -> dict[str, Processor]:
     return processors
 
 
-def processor_state(value: float) -> tuple[str, int, str]:
+def processor_state(value: float) -> Tuple[str, int, str]:
     # prosa_processors{type="node"} uses: -2 crashed, -1 stopped, 0 running,
     # and positive values for the restart count after a recoverable failure.
     if not math.isfinite(value):
@@ -327,9 +330,9 @@ def processor_state(value: float) -> tuple[str, int, str]:
     return "running after restart", int(value), "yellow"
 
 
-def build_services(samples: Iterable[Sample]) -> tuple[dict[str, Service], list[tuple[str, str]]]:
-    services: dict[str, Service] = {}
-    links: list[tuple[str, str]] = []
+def build_services(samples: Iterable[Sample]) -> Tuple[Dict[str, Service], List[Tuple[str, str]]]:
+    services = {}  # type: Dict[str, Service]
+    links = []  # type: List[Tuple[str, str]]
 
     for sample in samples:
         if sample.name != "prosa_services":
@@ -359,16 +362,24 @@ def build_services(samples: Iterable[Sample]) -> tuple[dict[str, Service], list[
     return services, links
 
 
-def natural_key(value: str) -> tuple[int, int | str]:
+def natural_key(value: str) -> Tuple[int, Union[int, str]]:
     return (0, int(value)) if value.isdecimal() else (1, value)
 
 
-def render(samples: list[Sample], url: str, use_color: bool) -> str:
+def group_ready(samples: Iterable[Sample]) -> Optional[bool]:
+    """Return the prosa_ready state, or None if the metric is not exposed."""
+    values = [sample.value for sample in samples if sample.name == "prosa_ready"]
+    if not values:
+        return None
+    return all(value == 1 for value in values)
+
+
+def render(samples: List[Sample], url: str, use_color: bool) -> str:
     groups = group_samples(samples)
     if not groups:
         return f"No ProSA metrics found at {url}"
 
-    lines: list[str] = []
+    lines = []  # type: List[str]
     now = dt.datetime.now().astimezone().replace(microsecond=0).isoformat()
     lines.append("ProSA metrics")
     lines.append(f"Endpoint: {url}")
@@ -382,10 +393,12 @@ def render(samples: list[Sample], url: str, use_color: bool) -> str:
     return "\n".join(lines)
 
 
-def render_group(key: GroupKey, samples: list[Sample], use_color: bool) -> list[str]:
-    lines: list[str] = []
+def render_group(key: GroupKey, samples: List[Sample], use_color: bool) -> List[str]:
+    lines = []  # type: List[str]
     title = group_title(key, samples)
     lines.append(f"Instance: {title}")
+    lines.append("")
+    lines.append(render_ready(samples, use_color))
     lines.append("")
     lines.extend(render_ram(samples))
     lines.append("")
@@ -427,7 +440,18 @@ def group_title(key: GroupKey, samples: Iterable[Sample]) -> str:
     return " ".join(parts)
 
 
-def render_ram(samples: Iterable[Sample]) -> list[str]:
+def render_ready(samples: Iterable[Sample], use_color: bool) -> str:
+    ready = group_ready(samples)
+    if ready is None:
+        state = colorize("unknown (no prosa_ready sample)", "yellow", use_color)
+    elif ready:
+        state = colorize("yes", "green", use_color)
+    else:
+        state = colorize("no", "red", use_color)
+    return f"Ready: {state}"
+
+
+def render_ram(samples: Iterable[Sample]) -> List[str]:
     ram = {
         sample.labels.get("type", "unknown"): sample.value
         for sample in samples
@@ -447,7 +471,7 @@ def render_ram(samples: Iterable[Sample]) -> list[str]:
     return lines
 
 
-def render_processors(processors: dict[str, Processor], use_color: bool) -> list[str]:
+def render_processors(processors: Dict[str, Processor], use_color: bool) -> List[str]:
     lines = ["Processors"]
     if not processors:
         lines.append("  no prosa_processors node samples")
@@ -469,11 +493,11 @@ def render_processors(processors: dict[str, Processor], use_color: bool) -> list
 
 
 def render_graph(
-    processors: dict[str, Processor],
-    services: dict[str, Service],
-    links: list[tuple[str, str]],
+    processors: Dict[str, Processor],
+    services: Dict[str, Service],
+    links: List[Tuple[str, str]],
     use_color: bool,
-) -> list[str]:
+) -> List[str]:
     lines = ["Node graph"]
     if not processors and not services:
         lines.append("  no graph nodes")
@@ -539,7 +563,7 @@ def format_bytes(value: float) -> str:
     return f"{size:.2f} TiB"
 
 
-def format_table(headers: list[str], rows: list[list[str]], prefix: str) -> list[str]:
+def format_table(headers: List[str], rows: List[List[str]], prefix: str) -> List[str]:
     widths = [
         max(visible_len(row[index]) for row in [headers, *rows])
         for index in range(len(headers))
@@ -550,7 +574,7 @@ def format_table(headers: list[str], rows: list[list[str]], prefix: str) -> list
     return lines
 
 
-def format_table_row(row: list[str], widths: list[int]) -> str:
+def format_table_row(row: List[str], widths: List[int]) -> str:
     cells = [
         pad(row[index], widths[index]) if index < len(row) - 1 else row[index]
         for index in range(len(row))
@@ -589,11 +613,33 @@ def run_once(args: argparse.Namespace) -> str:
     return render(samples, args.url, supports_color(args.no_color))
 
 
-def main(argv: list[str] | None = None) -> int:
+def run_check(args: argparse.Namespace) -> int:
+    samples = load_samples(args.url, args.timeout)
+    states = [group_ready(group) for group in group_samples(samples).values()]
+    if not states or any(state is None for state in states):
+        raise MetricsError(f"no prosa_ready metric found at {args.url}")
+    if all(states):
+        print("ready")
+        return EXIT_READY
+    print("not ready")
+    return EXIT_NOT_READY
+
+
+def main(argv: Optional[List[str]] = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
 
     if args.watch is not None and args.watch <= 0:
         raise MetricsError("--watch must be greater than 0")
+    if args.check and args.watch is not None:
+        print("error: --check cannot be used with --watch", file=sys.stderr)
+        return EXIT_ERROR
+
+    if args.check:
+        try:
+            return run_check(args)
+        except MetricsError as err:
+            print(f"error: {err}", file=sys.stderr)
+            return EXIT_ERROR
 
     while True:
         try:
@@ -601,7 +647,7 @@ def main(argv: list[str] | None = None) -> int:
         except MetricsError as err:
             if args.watch is None:
                 print(f"error: {err}", file=sys.stderr)
-                return 2
+                return EXIT_ERROR
             output = f"error: {err}"
 
         if args.watch is not None:

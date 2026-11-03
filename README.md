@@ -114,6 +114,18 @@ class { 'prosa::processors':
 Since processors have different configurations, `proc_settings` is provided as a `Hash` to accommodate all necessary configuration options.
 To determine which configurations to specify, refer to the documentation for the corresponding processor.
 
+### Tasks
+
+The module provides [Bolt](https://www.puppet.com/docs/bolt/latest/bolt.html) tasks to query ProSA instances:
+
+- `prosa::version`: returns the versions of ProSA and its processors.
+- `prosa::status`: returns the readiness of ProSA from the `prosa_ready` metric, and fails if ProSA is not ready.
+  It requires the monitoring script, deployed when a local Prometheus endpoint is configured in `observability`.
+
+```shell
+bolt task run prosa::status --targets <targets>
+```
+
 ## Reference
 
 For information on classes, types and functions see the [REFERENCE.md](./REFERENCE.md)
