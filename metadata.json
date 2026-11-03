@@ -1,6 +1,6 @@
 {
   "name": "worldline-prosa",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "author": "Worldline",
   "summary": "Installs, configures, and manages ProSA.",
   "license": "LGPL-3.0",
@@ -10,7 +10,7 @@
   "dependencies": [
     {
       "name": "puppetlabs/stdlib",
-      "version_requirement": ">= 4.13.1 < 10.0.0"
+      "version_requirement": ">= 4.13.1 < 11.0.0"
     }
   ],
   "operatingsystem_support": [
@@ -52,6 +52,6 @@
     "payments"
   ],
   "pdk-version": "3.4.0",
-  "template-url": "pdk-default#3.4.0",
-  "template-ref": "tags/3.4.0-0-gd3cc13f"
+  "template-url": "https://github.com/puppetlabs/pdk-templates#3.4.0.3",
+  "template-ref": "tags/3.4.0.3-0-g8fb22fc"
 }

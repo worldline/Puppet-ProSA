@@ -1,0 +1,5 @@
+{
+  "description": "Gets the ProSA components versions",
+  "input_method": "stdin",
+  "parameters": {}
+}
