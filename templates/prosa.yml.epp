@@ -1,7 +1,7 @@
-<%- | String                                           $prosa_name,
-      ProSA::TelemetryLevel                            $telemetry_level = 'warn',
-      Optional[Hash[String, String]]                   $telemetry_attributes = undef,
-      Hash[String, Hash[String, Hash[String, String]]] $observability
+<%- | String                         $prosa_name,
+      ProSA::TelemetryLevel          $telemetry_level = 'warn',
+      Optional[Hash[String, String]] $telemetry_attributes = undef,
+      ProSA::Observability           $observability
 | -%>
 # Main configuration file for ProSA: Managed by Puppet.
 # It contain the configuration that every ProSA instance must have
@@ -14,8 +14,11 @@ observability:
     <%= $key %>: <%= $value %>
   <%- } -%>
 <%- } -%>
+<%- if $observability['endpoint'] { -%>
+  endpoint: <%= $observability['endpoint'] %>
+<%- } -%>
 <%- if $observability { -%>
-<%- $observability.keys.each |$telemetry_type| { -%>
+<%- ($observability.keys - ['endpoint']).each |$telemetry_type| { -%>
   <%= $telemetry_type %>:
 <%- $observability[$telemetry_type].keys.each |$param| { -%>
   <%- if $param == 'otlp' or $param == 'prometheus' { -%>
