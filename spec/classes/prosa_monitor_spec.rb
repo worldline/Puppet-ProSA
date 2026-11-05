@@ -19,7 +19,7 @@ describe 'prosa' do
   let(:params) do
     {
       observability: {
-        'metrics' => { 'prometheus' => { 'endpoint' => '19090' } },
+        'metrics' => { 'prometheus' => { 'endpoint' => '127.0.0.1:19090' } },
         'traces' => { 'stdout' => { 'level' => 'info' } },
         'logs' => { 'stdout' => { 'level' => 'info' } },
       },

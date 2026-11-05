@@ -12,7 +12,8 @@ class prosa::service (
   Boolean $service_enable                  = true,
   Variant[Boolean, String] $service_ensure = 'running',
   Boolean $service_manage                  = true,
-  Optional[Integer] $service_limit_nofile  = undef
+  Optional[Integer] $service_limit_nofile  = undef,
+  Boolean $config_auto_reload              = false,
 ) {
   # The base class must be included first because parameter defaults depend on it
   if ! defined(Class['prosa::params']) {
@@ -37,14 +38,16 @@ class prosa::service (
         group   => $prosa::params::root_group,
         mode    => '0644',
         content => epp('prosa/service.epp', {
-            'prosa_name'   => $prosa_name,
-            'user'         => $user,
-            'group'        => $group,
-            'bin_path'     => $service_binary,
-            'conf_path'    => $app_conf,
-            'limit_nofile' => $service_limit_nofile,
+            'prosa_name'         => $prosa_name,
+            'user'               => $user,
+            'group'              => $group,
+            'bin_path'           => $service_binary,
+            'conf_path'          => $app_conf,
+            'limit_nofile'       => $service_limit_nofile,
+            'config_auto_reload' => $config_auto_reload,
         }),
         replace => true,
+        notify  => Service[$service_name],
       }
     } else { # The service provider need to be handle if the service is managed
       fail('Your system service provider is not handle by this module')

@@ -47,6 +47,14 @@
 #   This parameter corresponds to the `LimitNOFILE` directive in the systemd service unit file.<br />
 #   Apply the default system limit when set to `undef`.
 #
+# @param config_auto_reload
+#   Determines whether ProSA reloads its processor configuration files by itself.<br />
+#   When `true`, changes of processor and adaptor configuration files (see `prosa::proc`) don't restart the ProSA service.
+#   The main configuration file, the binary, the service unit and a new processor always restart it.<br />
+#   When `false`, the ProSA service restarts on every configuration change.<br />
+#   Requires a ProSA built with ProSA 0.5 or later, older versions never reload their configuration.<br />
+#   When `service_manage` is `true`, changing this value restarts the ProSA service once.
+#
 # @param manage_user
 #   When `false`, stops Puppet from creating the user resource.<br />
 #   This is for instances when you have a user, created from another Puppet module, you want 
@@ -87,22 +95,26 @@
 # @param observability
 #   Configures the ProSA [Observability](https://docs.rs/prosa-utils/latest/prosa_utils/config/observability/struct.Observability.html) directive
 #   which configure metrics, traces and logs export.<br />
+#   The `endpoint` key is the shared HTTP endpoint serving Prometheus metrics and health probes.
+#   It must be an `address:port`, like `0.0.0.0:9090`.<br />
+#   The legacy `metrics.prometheus.endpoint` key is still accepted for ProSA older than 0.5.2.<br />
 #   Refer to the [ProSA book](https://worldline.github.io/ProSA/ch01-02-01-observability.html) for more details on how to configure this directive.
 #
 # @example Setting custom observability configuration
 #   class { 'prosa':
 #     observability => {
-#       'metrics' => {
+#       'endpoint' => '0.0.0.0:9090',
+#       'metrics'  => {
 #         'stdout' => {
 #           'level' => 'info',
 #         },
 #       },
-#       'traces'  => {
+#       'traces'   => {
 #         'stdout' => {
 #           'level' => 'info',
 #         },
 #       },
-#       'logs'    => {
+#       'logs'     => {
 #         'stdout' => {
 #           'level' => 'info',
 #         },
@@ -122,14 +134,21 @@ class prosa (
   Boolean $service_manage                                         = true,
   Variant[Stdlib::Ensure::Service, Boolean] $service_ensure       = 'running',
   Optional[Integer] $service_limit_nofile                         = undef,
+  Boolean $config_auto_reload                                     = false,
   Boolean $manage_user                                            = true,
   Boolean $manage_group                                           = true,
   String $user                                                    = $prosa::params::user,
   String $group                                                   = $prosa::params::group,
   ProSA::TelemetryLevel $telemetry_level                          = $prosa::params::telemetry_level,
   Optional[Hash[String, String]] $telemetry_attributes            = undef,
-  Hash[String, Hash[String, Hash[String, String]]] $observability = $prosa::params::observability,
+  ProSA::Observability $observability                             = $prosa::params::observability,
 ) inherits prosa::params {
+  # Restart ProSA on processor configuration change only if it doesn't reload it by itself
+  $config_notify = $config_auto_reload ? {
+    true    => undef,
+    default => Class['prosa::service'],
+  }
+
   # declare ProSA user and group
   if $manage_group {
     group { $group:
@@ -168,17 +187,17 @@ class prosa (
     notify  => Class['prosa::service'],
   }
 
-  # Create a ProSA monitoring script only if Prometheus is locally configure
-  if (
-    'metrics' in $observability
-    and 'prometheus' in $observability['metrics']
-    and 'endpoint' in $observability['metrics']['prometheus']
-  ) {
-    $prometheus_endpoint = $observability['metrics']['prometheus']['endpoint']
+  # Create a ProSA monitoring script only if the metrics endpoint is locally configure
+  # The shared `endpoint` is the current one, `metrics.prometheus.endpoint` is the legacy one
+  $prometheus_endpoint = $observability['endpoint'] ? {
+    undef   => $observability.dig('metrics', 'prometheus', 'endpoint'),
+    default => $observability['endpoint'],
+  }
+
+  if $prometheus_endpoint {
     $prometheus_port_string = $prometheus_endpoint ? {
-      /^[0-9]+$/   => $prometheus_endpoint,
       /:([0-9]+)$/ => regsubst($prometheus_endpoint, '^.*:([0-9]+)$', '\1'),
-      default      => fail("Invalid ProSA Prometheus endpoint '${prometheus_endpoint}': expected a port or address ending with :port"),
+      default      => fail("Invalid ProSA Prometheus endpoint '${prometheus_endpoint}': expected an address ending with :port"),
     }
     $prometheus_port = Integer($prometheus_port_string)
 
@@ -221,5 +240,6 @@ class prosa (
     service_ensure       => $service_ensure,
     service_manage       => $service_manage,
     service_limit_nofile => $service_limit_nofile,
+    config_auto_reload   => $config_auto_reload,
   }
 }

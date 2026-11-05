@@ -54,6 +54,16 @@ define prosa::proc (
     default => { 'proc_max_restart_period' => $proc_max_restart_period },
   }
 
+  # A new processor is only started by a ProSA restart, even when ProSA reloads its configuration.
+  # Evaluated before the processor configuration file is written, so it runs only when the file doesn't exist yet.
+  exec { "prosa new processor ${proc_name}":
+    command => 'true',
+    path    => ['/usr/bin', '/bin'],
+    creates => "${prosa::conf_dir}/${proc_name}.yml",
+    require => File[$prosa::conf_dir],
+    notify  => Class['prosa::service'],
+  }
+
   # Write processor YAML configuration
   file { "${prosa::conf_dir}/${proc_name}.yml":
     ensure  => file,
@@ -61,8 +71,9 @@ define prosa::proc (
     group   => $prosa::group,
     mode    => $config_file_mode,
     content => stdlib::to_yaml({ "${proc_name}" => $hash_adaptor_config_path + $hash_proc_restart_duration_period + $hash_proc_max_restart_period + $proc_settings }, { header => false, indentation => 2 }),
-    require => File[$prosa::conf_dir],
-    notify  => Class['prosa::service'],
+    require => [File[$prosa::conf_dir], Exec["prosa new processor ${proc_name}"]],
+    before  => Class['prosa::service'],
+    notify  => $prosa::config_notify,
   }
 
   # Write adaptor YAML configuration if needed
@@ -74,7 +85,8 @@ define prosa::proc (
       mode    => $config_file_mode,
       content => stdlib::to_yaml($adaptor_settings, { header => false, indentation => 2 }),
       require => File[$prosa::conf_dir],
-      notify  => Class['prosa::service'],
+      before  => Class['prosa::service'],
+      notify  => $prosa::config_notify,
     }
   }
 }

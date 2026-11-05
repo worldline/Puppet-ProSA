@@ -4,10 +4,14 @@
       Stdlib::Absolutepath $bin_path = '/usr/local/bin/prosa',
       Stdlib::Absolutepath $conf_path = '/etc/prosa',
       Optional[Integer]    $limit_nofile = undef,
+      Boolean              $config_auto_reload = false,
 | -%>
+# Managed by Puppet. Changing config_auto_reload restarts ProSA.
+# config_auto_reload=<%= $config_auto_reload %>
 [Unit]
 Description=ProSA service for <%= $prosa_name %>
-After=network.target
+Wants=network-online.target
+After=network-online.target
 StartLimitIntervalSec=0
 
 [Service]
@@ -15,6 +19,8 @@ Type=simple
 User=<%= $user %>
 Group=<%= $group %>
 ExecStart=<%= $bin_path %> -c <%= $conf_path %>
+Restart=on-failure
+RestartSec=5
 <% if $limit_nofile { -%>
 LimitNOFILE=<%= $limit_nofile %>
 <% } -%>

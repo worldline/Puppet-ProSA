@@ -23,6 +23,7 @@ Use the `prosa::processors` defined type if you want to create processors
 
 ### Data types
 
+* [`ProSA::Observability`](#ProSA--Observability): The ProSA `observability` settings managed by this module.
 * [`ProSA::TelemetryLevel`](#ProSA--TelemetryLevel): A string that conforms to the ProSA `TelemetryLevel` syntax.
 
 ### Tasks
@@ -60,17 +61,18 @@ class { 'prosa':
 ```puppet
 class { 'prosa':
   observability => {
-    'metrics' => {
+    'endpoint' => '0.0.0.0:9090',
+    'metrics'  => {
       'stdout' => {
         'level' => 'info',
       },
     },
-    'traces'  => {
+    'traces'   => {
       'stdout' => {
         'level' => 'info',
       },
     },
-    'logs'    => {
+    'logs'     => {
       'stdout' => {
         'level' => 'info',
       },
@@ -94,6 +96,7 @@ The following parameters are available in the `prosa` class:
 * [`service_manage`](#-prosa--service_manage)
 * [`service_ensure`](#-prosa--service_ensure)
 * [`service_limit_nofile`](#-prosa--service_limit_nofile)
+* [`config_auto_reload`](#-prosa--config_auto_reload)
 * [`manage_user`](#-prosa--manage_user)
 * [`manage_group`](#-prosa--manage_group)
 * [`user`](#-prosa--user)
@@ -198,6 +201,19 @@ Apply the default system limit when set to `undef`.
 
 Default value: `undef`
 
+##### <a name="-prosa--config_auto_reload"></a>`config_auto_reload`
+
+Data type: `Boolean`
+
+Determines whether ProSA reloads its processor configuration files by itself.<br />
+When `true`, changes of processor and adaptor configuration files (see `prosa::proc`) don't restart the ProSA service.
+The main configuration file, the binary, the service unit and a new processor always restart it.<br />
+When `false`, the ProSA service restarts on every configuration change.<br />
+Requires a ProSA built with ProSA 0.5 or later, older versions never reload their configuration.<br />
+When `service_manage` is `true`, changing this value restarts the ProSA service once.
+
+Default value: `false`
+
 ##### <a name="-prosa--manage_user"></a>`manage_user`
 
 Data type: `Boolean`
@@ -259,10 +275,13 @@ Default value: `undef`
 
 ##### <a name="-prosa--observability"></a>`observability`
 
-Data type: `Hash[String, Hash[String, Hash[String, String]]]`
+Data type: `ProSA::Observability`
 
 Configures the ProSA [Observability](https://docs.rs/prosa-utils/latest/prosa_utils/config/observability/struct.Observability.html) directive
 which configure metrics, traces and logs export.<br />
+The `endpoint` key is the shared HTTP endpoint serving Prometheus metrics and health probes.
+It must be an `address:port`, like `0.0.0.0:9090`.<br />
+The legacy `metrics.prometheus.endpoint` key is still accepted for ProSA older than 0.5.2.<br />
 Refer to the [ProSA book](https://worldline.github.io/ProSA/ch01-02-01-observability.html) for more details on how to configure this directive.
 
 Default value: `$prosa::params::observability`
@@ -379,6 +398,25 @@ If not set, the permission will be '0644'.
 Default value: `undef`
 
 ## Data types
+
+### <a name="ProSA--Observability"></a>`ProSA::Observability`
+
+* `endpoint`: shared HTTP endpoint (`address:port`) serving Prometheus metrics and health probes.
+* `metrics`, `traces`, `logs`: exporters settings, indexed by exporter (`stdout`, `otlp`, and the legacy `prometheus` for metrics).
+
+* **See also**
+  * https://docs.rs/prosa-utils/latest/prosa_utils/config/observability/struct.Observability.html
+
+Alias of
+
+```puppet
+Struct[{
+    Optional['endpoint'] => String[1],
+    Optional['metrics']  => Hash[String, Hash[String, String]],
+    Optional['traces']   => Hash[String, Hash[String, String]],
+    Optional['logs']     => Hash[String, Hash[String, String]],
+}]
+```
 
 ### <a name="ProSA--TelemetryLevel"></a>`ProSA::TelemetryLevel`
 
